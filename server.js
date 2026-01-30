@@ -8,6 +8,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("SmartJob AI Backend is running 🚀");
+});
+
 // Debug (Render log will show if env is loaded)
 console.log("Mongo URI =", process.env.MONGO_URI);
 
