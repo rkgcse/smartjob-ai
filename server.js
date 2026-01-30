@@ -1,45 +1,104 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 
 const app = express();
-
-// Middlewares
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
-app.get("/", (req, res) => {
-  res.send("SmartJob AI Backend is running 🚀");
+// MongoDB
+mongoose.connect(process.env.MONGO_URI).then(() => {
+  console.log("MongoDB Connected");
 });
 
-// Debug (Render log will show if env is loaded)
-console.log("Mongo URI =", process.env.MONGO_URI);
+// ================= MODELS =================
 
-// Connect MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch(err => {
-    console.error("MongoDB connection error:", err);
-    process.exit(1);
-  });
+const UserSchema = new mongoose.Schema({
+  name: String,
+  email: { type: String, unique: true },
+  password: String,
+});
 
-// Routes
-const User = require("./models/User");
-const bcrypt = require("bcryptjs");
+const AdminSchema = new mongoose.Schema({
+  email: String,
+  password: String,
+});
 
-app.post("/api/register", async (req, res) => {
+const User = mongoose.model("User", UserSchema);
+const Admin = mongoose.model("Admin", AdminSchema);
+
+// ================= USER AUTH =================
+
+// User Register
+app.post("/api/user/register", async (req, res) => {
   try {
-    const hashed = await bcrypt.hash(req.body.password, 10);
-    const user = new User({ ...req.body, password: hashed });
-    await user.save();
+    const { name, email, password } = req.body;
+
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(400).json({ message: "User already exists" });
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashed,
+    });
+
     res.json({ message: "User registered" });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: "Register failed" });
   }
 });
 
-// Render PORT fix
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log("Backend running on port", PORT);
+// User Login
+app.post("/api/user/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ message: "Wrong password" });
+
+    const token = jwt.sign({ id: user._id }, "SECRET");
+
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ message: "Login failed" });
+  }
 });
+
+// User Profile (Dashboard)
+app.get("/api/profile", async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    const decoded = jwt.verify(token, "SECRET");
+
+    const user = await User.findById(decoded.id).select("-password");
+    res.json(user);
+  } catch {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+});
+
+// ================= ADMIN AUTH =================
+
+app.post("/api/admin/login", async (req, res) => {
+  const admin = await Admin.findOne({ email: req.body.email });
+  if (!admin) return res.status(401).send("Invalid");
+
+  const ok = await bcrypt.compare(req.body.password, admin.password);
+  if (!ok) return res.status(401).send("Invalid");
+
+  const token = jwt.sign({ id: admin._id, role: "admin" }, "SECRET");
+  res.json({ token });
+});
+
+// ================= SERVER =================
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log("Server running on " + PORT));
