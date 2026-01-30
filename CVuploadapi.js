@@ -1,21 +1,38 @@
 const multer = require("multer");
 const axios = require("axios");
+const jwt = require("jsonwebtoken");
+const FormData = require("form-data");
+const User = require("./models/User");
+
 const upload = multer();
 
-app.post("/api/upload-cv", upload.single("cv"), async (req, res) => {
-  const token = req.headers.authorization;
-  const data = jwt.verify(token, "SECRET");
+module.exports = (app) => {
 
-  const formData = new FormData();
-  formData.append("file", req.file.buffer, req.file.originalname);
+  app.post("/api/upload-cv", upload.single("cv"), async (req, res) => {
+    try {
+      const token = req.headers.authorization;
+      const data = jwt.verify(token, "SECRET");
 
-  const aiRes = await axios.post("http://localhost:8000/parse-cv", formData, {
-    headers: formData.getHeaders()
+      const formData = new FormData();
+      formData.append("file", req.file.buffer, req.file.originalname);
+
+      // 🚨 Replace this with your real deployed AI CV URL
+      const AI_CV_URL = "https://cv-ai-production.up.railway.app/parse-cv";
+
+      const aiRes = await axios.post(AI_CV_URL, formData, {
+        headers: formData.getHeaders(),
+      });
+
+      await User.findByIdAndUpdate(data.id, {
+        cv_data: aiRes.data,
+      });
+
+      res.json({ message: "CV analyzed successfully", data: aiRes.data });
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "CV processing failed" });
+    }
   });
 
-  await User.findByIdAndUpdate(data.id, {
-    cv_data: aiRes.data
-  });
-
-  res.send({ message: "CV analyzed" });
-});
+};
