@@ -76,18 +76,13 @@ const auth = (req, res, next) => {
 
 // ================= MATCH JOBS =================
 app.get("/api/match-jobs", auth, async (req, res) => {
-  res.json([]); // temporary (we will connect matching later)
+  res.json([]);
 });
 
-// ================= SERVER =================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log("Server running on " + PORT));
+
 // ========== CREATE ADMIN (RUN ONCE) ==========
 app.get("/create-admin", async (req, res) => {
   try {
-    const bcrypt = require("bcryptjs");
-    const Admin = require("./models/Admin"); // adjust path if needed
-
     const hash = await bcrypt.hash("admin123", 10);
 
     await Admin.deleteMany({ email: "admin@smartjob.ai" });
@@ -102,3 +97,8 @@ app.get("/create-admin", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
+
+
+// ================= SERVER =================
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log("Server running on " + PORT));
