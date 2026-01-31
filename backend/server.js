@@ -82,3 +82,23 @@ app.get("/api/match-jobs", auth, async (req, res) => {
 // ================= SERVER =================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log("Server running on " + PORT));
+// ========== CREATE ADMIN (RUN ONCE) ==========
+app.get("/create-admin", async (req, res) => {
+  try {
+    const bcrypt = require("bcryptjs");
+    const Admin = require("./models/Admin"); // adjust path if needed
+
+    const hash = await bcrypt.hash("admin123", 10);
+
+    await Admin.deleteMany({ email: "admin@smartjob.ai" });
+
+    await Admin.create({
+      email: "admin@smartjob.ai",
+      password: hash
+    });
+
+    res.send("ADMIN CREATED IN RENDER DATABASE");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
