@@ -12,8 +12,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/admin-login" />} />
 
-        <Route path="/admin-login" element={<AdminLogin />} />
-
+        <Route path="/" element={<UserLogin />} />
+<Route path="/admin-login" element={<AdminLogin />} />
         <Route
           path="/dashboard"
           element={isAdminLoggedIn ? <Dashboard /> : <Navigate to="/admin-login" />}
