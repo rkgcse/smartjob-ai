@@ -1,5 +1,17 @@
 import { useState } from "react";
 import axios from "axios";
+import Navbar from "../components/Navbar";
+
+export default function Dashboard() {
+  return (
+    <>
+      <Navbar />
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+      </div>
+    </>
+  );
+}
 
 const API = "https://smartjob-ai.onrender.com";
 
