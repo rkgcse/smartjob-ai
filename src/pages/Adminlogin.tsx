@@ -12,21 +12,24 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const res = await fetch("fetch("https://smartjob-ai.onrender.com/api/admin/login", {", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+      const res = await fetch(
+        "https://smartjob-ai.onrender.com/api/admin/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        }
+      );
 
       const data = await res.json();
 
       if (!res.ok) {
-        alert("Invalid admin login");
+        alert(data.message || "Invalid admin login");
         setLoading(false);
         return;
       }
