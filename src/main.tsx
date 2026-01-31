@@ -1,31 +1,117 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+require("dotenv").config();
+const express = require("express");
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const cors = require("cors");
 
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Upload from "./pages/Upload";
+const app = express();
+app.use(express.json());
+app.use(cors());
 
-import AdminLogin from "./pages/AdminLogin";
-import AdminDashboard from "./pages/AdminDashboard";
+// ================= MONGODB =================
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => console.log(err));
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
+// ================= MODELS =================
+const User = mongoose.model("User", new mongoose.Schema({
+  name: String,
+  email: { type: String, unique: true },
+  password: String,
+}));
 
-        {/* USER ROUTES */}
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/upload" element={<Upload />} />
+const Admin = mongoose.model("Admin", new mongoose.Schema({
+  email: String,
+  password: String,
+}));
 
-        {/* ADMIN ROUTES */}
-        <Route path="/admin" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+// ================= USER AUTH =================
+app.post("/api/user/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
 
-      </Routes>
-    </BrowserRouter>
-  </React.StrictMode>
-);
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(400).json({ message: "User exists" });
+
+    const hash = await bcrypt.hash(password, 10);
+    await User.create({ name, email, password: hash });
+
+    res.json({ message: "User registered" });
+  } catch {
+    res.status(500).json({ message: "Register failed" });
+  }
+});
+
+app.post("/api/user/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ message: "Invalid" });
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ message: "Invalid" });
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+    res.json({ token });
+  } catch {
+    res.status(500).json({ message: "Login failed" });
+  }
+});
+
+// ================= ADMIN AUTH =================
+app.post("/api/admin/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const admin = await Admin.findOne({ email });
+    if (!admin) return res.status(401).json({ message: "Invalid admin" });
+
+    const ok = await bcrypt.compare(password, admin.password);
+    if (!ok) return res.status(401).json({ message: "Invalid admin" });
+
+    const token = jwt.sign({ id: admin._id, role: "admin" }, process.env.JWT_SECRET);
+    res.json({ token });
+  } catch {
+    res.status(500).json({ message: "Admin login failed" });
+  }
+});
+
+// ================= AUTH MIDDLEWARE =================
+const auth = (req, res, next) => {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).send("Unauthorized");
+  }
+};
+
+// ================= MATCH JOBS =================
+app.get("/api/match-jobs", auth, async (req, res) => {
+  res.json([]); // AI logic will come later
+});
+
+// ================= CREATE ADMIN (RUN ONCE) =================
+app.get("/create-admin", async (req, res) => {
+  try {
+    const hash = await bcrypt.hash("admin123", 10);
+
+    await Admin.deleteMany({ email: "admin@smartjob.ai" });
+
+    await Admin.create({
+      email: "admin@smartjob.ai",
+      password: hash
+    });
+
+    res.send("ADMIN CREATED SUCCESSFULLY");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// ================= SERVER =================
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log("Server running on " + PORT));
